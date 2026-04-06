@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blast Off!</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0a0a2e;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      overflow: hidden;
+      font-family: sans-serif;
+    }
+
+    /* Stars */
+    .stars { position: fixed; inset: 0; pointer-events: none; }
+    .star {
+      position: absolute;
+      background: white;
+      border-radius: 50%;
+      animation: twinkle var(--d) infinite alternate;
+    }
+    @keyframes twinkle {
+      from { opacity: 0.2; }
+      to   { opacity: 1; }
+    }
+
+    /* Ground */
+    .ground {
+      width: 100%;
+      height: 100px;
+      background: linear-gradient(to bottom, #1a5c1a, #0d3d0d);
+      border-radius: 50% 50% 0 0 / 30px 30px 0 0;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 2;
+    }
+
+    /* Launch pad */
+    .pad {
+      position: absolute;
+      bottom: 75px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 200px;
+      height: 24px;
+      background: #999;
+      border-radius: 8px;
+      z-index: 3;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    }
+    .pad::before, .pad::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      width: 18px;
+      height: 60px;
+      background: #777;
+      border-radius: 6px;
+    }
+    .pad::before { left: 24px; transform-origin: bottom; transform: rotate(-15deg); }
+    .pad::after  { right: 24px; transform-origin: bottom; transform: rotate(15deg); }
+
+    /* Boy */
+    #boy {
+      position: fixed;
+      bottom: 100px;   /* sits on the ground */
+      left: -120px;    /* starts off-screen left */
+      height: 110px;
+      z-index: 5;
+      image-rendering: auto;
+      transform-origin: bottom center;
+    }
+    #boy.walking {
+      /* JS sets the target translateX; this class triggers it */
+      transition: left 3s linear;
+    }
+    @keyframes walk-bob {
+      0%   { transform: translateY(0px)   rotate(-1deg); }
+      25%  { transform: translateY(-6px)  rotate(0deg);  }
+      50%  { transform: translateY(0px)   rotate(1deg);  }
+      75%  { transform: translateY(-6px)  rotate(0deg);  }
+      100% { transform: translateY(0px)   rotate(-1deg); }
+    }
+    #boy.bobbing {
+      animation: walk-bob 0.45s ease-in-out infinite;
+    }
+    @keyframes climb-in {
+      0%   { transform: scale(1)    translateY(0px);  opacity: 1; }
+      60%  { transform: scale(0.45) translateY(-60px); opacity: 1; }
+      100% { transform: scale(0)    translateY(-120px); opacity: 0; }
+    }
+    #boy.climbing {
+      animation: climb-in 0.9s ease-in forwards;
+    }
+
+    /* Silo opening in the ground */
+    .silo {
+      position: absolute;
+      bottom: 98px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 90px;
+      height: 16px;
+      background: #111;
+      border-radius: 6px 6px 0 0;
+      z-index: 4;
+      box-shadow: inset 0 4px 8px rgba(0,0,0,0.8);
+    }
+
+    /* Rocket */
+    #rocket {
+      position: fixed;
+      bottom: -220px;   /* starts hidden below ground */
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 180px;
+      line-height: 1;
+      z-index: 1;       /* under the ground until emerged */
+      cursor: default;
+      filter: drop-shadow(0 0 0px orange);
+    }
+    @keyframes emerge {
+      0%   { bottom: -220px; }
+      100% { bottom: 110px; }
+    }
+    #rocket.emerging {
+      animation: emerge 1.8s cubic-bezier(0.2, 0, 0.4, 1) forwards;
+    }
+    #rocket.rumbling {
+      animation: rumble 0.12s infinite;
+    }
+    @keyframes rumble {
+      0%   { transform: translateX(calc(-50% - 5px)) rotate(-2deg); }
+      25%  { transform: translateX(calc(-50% + 5px)) rotate(2deg); }
+      50%  { transform: translateX(calc(-50% - 3px)) rotate(-1deg); }
+      75%  { transform: translateX(calc(-50% + 3px)) rotate(1deg); }
+      100% { transform: translateX(-50%) rotate(0deg); }
+    }
+    #rocket.blasting {
+      animation: blastoff 3s cubic-bezier(0.6, 0, 0.4, 1) forwards;
+    }
+    @keyframes blastoff {
+      0%   { bottom: 110px; filter: drop-shadow(0 0 20px orange); transform: translateX(-50%); }
+      8%   { bottom:  80px; filter: drop-shadow(0 0 40px orange); }
+      18%  { bottom: 140px; filter: drop-shadow(0 0 60px yellow); }
+      35%  { bottom: 300px; filter: drop-shadow(0 0 80px yellow); }
+      100% { bottom: 140vh; filter: drop-shadow(0 0 100px white); }
+    }
+
+    /* Flames */
+    #flames {
+      position: fixed;
+      bottom: 90px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0px;
+      line-height: 1;
+      z-index: 9;
+      opacity: 0;
+      pointer-events: none;
+      letter-spacing: -8px;
+    }
+    #flames.rumbling {
+      font-size: 60px;
+      opacity: 1;
+      animation: flameflicker 0.1s infinite alternate;
+    }
+    @keyframes flameflicker {
+      from { font-size: 55px; opacity: 0.8; }
+      to   { font-size: 70px; opacity: 1; }
+    }
+    #flames.blasting {
+      animation: flameanim 3s forwards;
+    }
+    @keyframes flameanim {
+      0%   { opacity: 1; bottom: 90px;  font-size: 120px; }
+      8%   { bottom: 60px; font-size: 140px; }
+      100% { opacity: 1; bottom: 140vh; font-size: 160px; }
+    }
+
+    /* Smoke puffs */
+    .puff {
+      position: fixed;
+      font-size: 64px;
+      z-index: 8;
+      pointer-events: none;
+      opacity: 0;
+    }
+    .puff.pop {
+      animation: puffanim 2.5s ease-out forwards;
+    }
+    @keyframes puffanim {
+      0%   { opacity: 1;   transform: scale(0.4) translate(0, 0); }
+      100% { opacity: 0;   transform: scale(3.5) translate(var(--dx), var(--dy)); }
+    }
+
+    /* Screen flash */
+    #flash {
+      position: fixed;
+      inset: 0;
+      background: white;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 50;
+    }
+    #flash.pop {
+      animation: flashanim 0.4s ease-out forwards;
+    }
+    @keyframes flashanim {
+      0%   { opacity: 0.8; }
+      100% { opacity: 0; }
+    }
+
+    /* Screen shake */
+    body.shaking { animation: screenshake 0.15s infinite; }
+    @keyframes screenshake {
+      0%   { transform: translate(-4px, -3px); }
+      25%  { transform: translate( 4px,  2px); }
+      50%  { transform: translate(-2px,  4px); }
+      75%  { transform: translate( 3px, -2px); }
+      100% { transform: translate(0, 0); }
+    }
+
+    /* Countdown */
+    #countdown {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0);
+      font-size: 12rem;
+      font-weight: 900;
+      color: white;
+      text-shadow: 0 0 40px red, 0 0 80px orange;
+      pointer-events: none;
+      z-index: 40;
+    }
+    #countdown.pop {
+      animation: cdpop 0.85s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+    @keyframes cdpop {
+      0%   { transform: translate(-50%, -50%) scale(0);   opacity: 1; }
+      40%  { transform: translate(-50%, -50%) scale(1.1); opacity: 1; }
+      70%  { transform: translate(-50%, -50%) scale(1);   opacity: 1; }
+      100% { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
+    }
+
+    /* Message */
+    #msg {
+      position: fixed;
+      top: 40%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0);
+      font-size: 5rem;
+      font-weight: bold;
+      color: white;
+      text-shadow: 0 0 30px yellow, 0 0 80px orange;
+      text-align: center;
+      pointer-events: none;
+      z-index: 30;
+      transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+      white-space: nowrap;
+    }
+    #msg.show { transform: translate(-50%, -50%) scale(1); }
+
+    /* Fire truck */
+    #firetruck {
+      position: fixed;
+      bottom: 100px;
+      left: calc(100vw + 20px);
+      font-size: 120px;
+      line-height: 1;
+      z-index: 6;
+      pointer-events: none;
+      transform: scaleX(-1);
+    }
+    @keyframes firetruck-drive {
+      0%   { left: calc(100vw + 20px); }
+      100% { left: -160px; }
+    }
+    @keyframes truck-bob {
+      0%   { transform: translateY(0px); }
+      50%  { transform: translateY(-5px); }
+      100% { transform: translateY(0px); }
+    }
+    #firetruck.driving {
+      animation:
+        firetruck-drive 3.5s linear forwards,
+        truck-bob       0.3s ease-in-out infinite;
+    }
+
+    /* Big truck */
+    #bigtruck {
+      position: fixed;
+      bottom: 98px;
+      left: -200px;
+      font-size: 140px;
+      line-height: 1;
+      z-index: 6;
+      pointer-events: none;
+      transform: scaleX(-1);
+    }
+    @keyframes bigtruck-drive {
+      0%   { left: -200px; }
+      100% { left: calc(100vw + 40px); }
+    }
+    @keyframes bigtruck-bob {
+      0%   { transform: scaleX(-1) translateY(0px); }
+      25%  { transform: scaleX(-1) translateY(-8px); }
+      50%  { transform: scaleX(-1) translateY(-2px); }
+      75%  { transform: scaleX(-1) translateY(-9px); }
+      100% { transform: scaleX(-1) translateY(0px); }
+    }
+    #bigtruck.driving {
+      animation:
+        bigtruck-drive 4.5s linear forwards,
+        bigtruck-bob   0.5s ease-in-out infinite;
+    }
+
+    /* Train */
+    #train {
+      position: fixed;
+      bottom: 98px;
+      left: -420px;
+      font-size: 110px;
+      line-height: 1;
+      z-index: 6;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    @keyframes train-pass1 {
+      0%   { left: -420px; }
+      100% { left: calc(100vw + 40px); }
+    }
+    @keyframes train-pass2 {
+      0%   { left: calc(100vw + 40px); }
+      100% { left: -420px; }
+    }
+    @keyframes train-bob {
+      0%   { transform: translateY(0px); }
+      50%  { transform: translateY(-4px); }
+      100% { transform: translateY(0px); }
+    }
+    @keyframes train-bob-flip {
+      0%   { transform: scaleX(-1) translateY(0px); }
+      50%  { transform: scaleX(-1) translateY(-4px); }
+      100% { transform: scaleX(-1) translateY(0px); }
+    }
+    #train.pass1 {
+      animation: train-pass1 4s linear forwards, train-bob-flip 0.35s ease-in-out infinite;
+    }
+    #train.pass2 {
+      animation: train-pass2 4s linear forwards, train-bob 0.35s ease-in-out infinite;
+    }
+
+    /* Buttons */
+    #buttons {
+      position: fixed;
+      bottom: 24px;
+      z-index: 20;
+      display: flex;
+      gap: 24px;
+    }
+    .btn {
+      padding: 20px 48px;
+      font-size: 2rem;
+      font-weight: bold;
+      color: white;
+      border: none;
+      border-radius: 60px;
+      cursor: pointer;
+      transition: transform 0.1s, box-shadow 0.1s;
+      letter-spacing: 2px;
+    }
+    #btnRocket {
+      background: linear-gradient(135deg, #ff2200, #ff8c00);
+      box-shadow: 0 6px 32px rgba(255,80,0,0.6);
+    }
+    #btnRocket:hover  { transform: scale(1.06); box-shadow: 0 8px 40px rgba(255,80,0,0.8); }
+    #btnRocket:active { transform: scale(0.97); }
+    #btnFire {
+      background: linear-gradient(135deg, #cc0000, #ff4444);
+      box-shadow: 0 6px 32px rgba(200,0,0,0.5);
+    }
+    #btnFire:hover  { transform: scale(1.06); box-shadow: 0 8px 40px rgba(200,0,0,0.7); }
+    #btnFire:active { transform: scale(0.97); }
+    #btnTruck {
+      background: linear-gradient(135deg, #e67e00, #f5c400);
+      box-shadow: 0 6px 32px rgba(200,140,0,0.5);
+    }
+    #btnTruck:hover  { transform: scale(1.06); box-shadow: 0 8px 40px rgba(200,140,0,0.7); }
+    #btnTruck:active { transform: scale(0.97); }
+    #btnTrain {
+      background: linear-gradient(135deg, #1a6bbf, #36c6f0);
+      box-shadow: 0 6px 32px rgba(30,100,200,0.5);
+    }
+    #btnTrain:hover  { transform: scale(1.06); box-shadow: 0 8px 40px rgba(30,100,200,0.7); }
+    #btnTrain:active { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; box-shadow: none; }
+  </style>
+</head>
+<body>
+
+  <audio id="countdownSound" src="54321blastoff.m4a" preload="auto"></audio>
+  <audio id="launchSound" src="launch-sound.mp3" preload="auto"></audio>
+  <audio id="sirenSound" src="fire-engine-siren.mp3" preload="auto"></audio>
+  <audio id="truckSound" src="truckengine.mp3" preload="auto"></audio>
+  <audio id="trainSound" src="train sound.mp3" preload="auto"></audio>
+  <div class="stars" id="stars"></div>
+  <div id="flash"></div>
+  <div id="countdown"></div>
+  <div id="msg">🌟 BLAST OFF! 🌟</div>
+  <div id="flames">🔥🔥🔥</div>
+  <div id="rocket">🚀</div>
+  <div id="firetruck">🚒</div>
+  <div id="bigtruck">🚛</div>
+  <div id="train">🚂🚃🚃</div>
+  <img id="boy" src="boy.png" alt="boy">
+
+  <div class="puff" id="p1">💨</div>
+  <div class="puff" id="p2">💨</div>
+  <div class="puff" id="p3">💨</div>
+  <div class="puff" id="p4">💨</div>
+  <div class="puff" id="p5">💨</div>
+  <div class="puff" id="p6">💨</div>
+
+  <div class="ground">
+    <div class="pad"></div>
+    <div class="silo"></div>
+  </div>
+
+  <div id="buttons">
+    <button id="btnRocket" class="btn">🚀</button>
+    <button id="btnFire"   class="btn">🚒</button>
+    <button id="btnTruck"  class="btn">🚛</button>
+    <button id="btnTrain"  class="btn">🚂</button>
+  </div>
+
+  <script>
+    // Stars
+    const starsEl = document.getElementById('stars');
+    for (let i = 0; i < 160; i++) {
+      const s = document.createElement('div');
+      s.className = 'star';
+      const size = Math.random() * 3.5 + 1;
+      s.style.cssText = `width:${size}px;height:${size}px;top:${Math.random()*100}%;left:${Math.random()*100}%;--d:${(Math.random()*2+0.8).toFixed(1)}s;`;
+      starsEl.appendChild(s);
+    }
+
+    const countdownSound = document.getElementById('countdownSound');
+    const launchSound    = document.getElementById('launchSound');
+    const sirenSound     = document.getElementById('sirenSound');
+    const truckSound     = document.getElementById('truckSound');
+    const trainSound     = document.getElementById('trainSound');
+    const firetruck      = document.getElementById('firetruck');
+    const bigtruck       = document.getElementById('bigtruck');
+    const train          = document.getElementById('train');
+    const btnRocket = document.getElementById('btnRocket');
+    const btnFire   = document.getElementById('btnFire');
+    const btnTruck  = document.getElementById('btnTruck');
+    const btnTrain  = document.getElementById('btnTrain');
+    const allBtns   = [btnRocket, btnFire, btnTruck, btnTrain];
+    const rocket = document.getElementById('rocket');
+    const flames = document.getElementById('flames');
+    const msg    = document.getElementById('msg');
+    const flash  = document.getElementById('flash');
+    const cdEl   = document.getElementById('countdown');
+    const boy    = document.getElementById('boy');
+    const puffs  = ['p1','p2','p3','p4','p5','p6'].map(id => document.getElementById(id));
+
+    function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    function placePuffs() {
+      const rx = window.innerWidth / 2;
+      const ry = window.innerHeight - 110;
+      const offsets = [[-90,-10],[90,-10],[-50,20],[50,20],[-130,30],[130,30]];
+      puffs.forEach((p, i) => {
+        const [dx, dy] = offsets[i];
+        p.style.left = (rx + dx - 32) + 'px';
+        p.style.top  = (ry - 32) + 'px';
+        p.style.setProperty('--dx', (dx * 2) + 'px');
+        p.style.setProperty('--dy', (dy * 3 - 60) + 'px');
+      });
+    }
+
+    function showCountdown(n) {
+      return new Promise(resolve => {
+        cdEl.textContent = n === 0 ? '🔥' : n;
+        cdEl.classList.remove('pop');
+        void cdEl.offsetWidth;
+        cdEl.classList.add('pop');
+        setTimeout(resolve, 540);
+      });
+    }
+
+    async function walkBoyToRocket() {
+      // Boy walks from off-screen left to just left of the rocket center
+      const rocketCenterX = window.innerWidth / 2;
+      const boyWidth = boy.offsetWidth;
+      // Land the boy just at the base of the rocket
+      const targetLeft = rocketCenterX - boyWidth / 2 - 10;
+
+      boy.classList.add('bobbing');
+
+      // Trigger CSS transition for walking
+      // Small delay so browser registers the starting position
+      await wait(30);
+      boy.style.transition = 'left 3s linear';
+      boy.style.left = targetLeft + 'px';
+
+      // Wait for walk to finish
+      await wait(3100);
+
+      // Stop bobbing, play climb-in
+      boy.classList.remove('bobbing');
+      boy.style.transition = 'none';
+      boy.classList.add('climbing');
+      await wait(950);
+    }
+
+    async function emergeRocket() {
+      rocket.classList.add('emerging');
+      await wait(1800);
+      rocket.classList.remove('emerging');
+      rocket.style.bottom = '110px';
+      rocket.style.zIndex = '10';
+    }
+
+    function resetRocket() {
+      rocket.style.transition = 'none';
+      rocket.style.bottom = '-220px';
+      rocket.style.zIndex = '1';
+      void rocket.offsetWidth;
+    }
+
+    function resetBoy() {
+      boy.classList.remove('bobbing', 'climbing', 'walking');
+      boy.style.transition = 'none';
+      boy.style.left = '-120px';
+      // Force reflow
+      void boy.offsetWidth;
+    }
+
+    function disableBtns() { allBtns.forEach(b => b.disabled = true); }
+    function enableBtns()  { allBtns.forEach(b => b.disabled = false); }
+
+    function runFiretruck() {
+      return new Promise(resolve => {
+        sirenSound.currentTime = 0;
+        sirenSound.volume = 1;
+        sirenSound.play();
+        firetruck.classList.add('driving');
+
+        // Fade siren out over the last second of the drive
+        setTimeout(() => {
+          const fadeSteps = 20;
+          const fadeInterval = 1000 / fadeSteps;
+          let step = 0;
+          const fader = setInterval(() => {
+            step++;
+            sirenSound.volume = Math.max(0, 1 - step / fadeSteps);
+            if (step >= fadeSteps) {
+              clearInterval(fader);
+              sirenSound.pause();
+            }
+          }, fadeInterval);
+        }, 2500);
+
+        setTimeout(() => {
+          firetruck.classList.remove('driving');
+          firetruck.style.left = 'calc(100vw + 20px)';
+          void firetruck.offsetWidth;
+          resolve();
+        }, 3600);
+      });
+    }
+
+    btnRocket.addEventListener('click', async () => {
+      disableBtns();
+      placePuffs();
+
+      // 1. Rocket rises from silo while Elmo walks over simultaneously
+      await Promise.all([emergeRocket(), walkBoyToRocket()]);
+
+      // 2. Countdown
+      countdownSound.currentTime = 0;
+      countdownSound.play();
+      await showCountdown(5);
+      await showCountdown(4);
+      await showCountdown(3);
+      await showCountdown(2);
+      await showCountdown(1);
+
+      // 3. Engines rumble
+      rocket.classList.add('rumbling');
+      flames.classList.add('rumbling');
+      document.body.classList.add('shaking');
+      await wait(700);
+
+      // 4. LAUNCH
+      launchSound.currentTime = 0;
+      launchSound.play();
+      flash.classList.remove('pop');
+      void flash.offsetWidth;
+      flash.classList.add('pop');
+
+      rocket.classList.remove('rumbling');
+      flames.classList.remove('rumbling');
+      document.body.classList.remove('shaking');
+
+      rocket.classList.add('blasting');
+      flames.classList.add('blasting');
+
+      puffs.forEach((p, i) => {
+        setTimeout(() => {
+          p.classList.remove('pop');
+          void p.offsetWidth;
+          p.classList.add('pop');
+        }, i * 100);
+      });
+
+      setTimeout(() => msg.classList.add('show'), 800);
+
+      // 5. Reset everything
+      await wait(500);
+      rocket.classList.remove('blasting');
+      flames.classList.remove('blasting');
+      msg.classList.remove('show');
+      puffs.forEach(p => p.classList.remove('pop'));
+      resetRocket();
+      resetBoy();
+      enableBtns();
+    });
+
+    btnFire.addEventListener('click', async () => {
+      disableBtns();
+      await runFiretruck();
+      enableBtns();
+    });
+
+    function runBigtruck() {
+      return new Promise(resolve => {
+        truckSound.currentTime = 0;
+        truckSound.volume = 1;
+        truckSound.play();
+        bigtruck.classList.add('driving');
+
+        // Fade engine sound out over the last 1.5s of the drive
+        setTimeout(() => {
+          const fadeSteps = 20;
+          const fadeInterval = 1500 / fadeSteps;
+          let step = 0;
+          const fader = setInterval(() => {
+            step++;
+            truckSound.volume = Math.max(0, 1 - step / fadeSteps);
+            if (step >= fadeSteps) {
+              clearInterval(fader);
+              truckSound.pause();
+            }
+          }, fadeInterval);
+        }, 3000);
+
+        setTimeout(() => {
+          bigtruck.classList.remove('driving');
+          bigtruck.style.left = '-200px';
+          void bigtruck.offsetWidth;
+          resolve();
+        }, 4600);
+      });
+    }
+
+    btnTruck.addEventListener('click', async () => {
+      disableBtns();
+      await runBigtruck();
+      enableBtns();
+    });
+
+    async function runTrain() {
+      trainSound.currentTime = 0;
+      trainSound.volume = 1;
+      trainSound.play();
+
+      // Pass 1: left to right
+      train.classList.remove('pass1', 'pass2');
+      void train.offsetWidth;
+      train.classList.add('pass1');
+      await wait(4000);
+
+      // Brief gap while off-screen, flip for pass 2
+      train.classList.remove('pass1');
+      train.style.left = 'calc(100vw + 40px)';
+      void train.offsetWidth;
+      await wait(300);
+
+      // Pass 2: right to left (flipped)
+      train.classList.add('pass2');
+      await wait(4000);
+
+      // Fade sound out over the last bit
+      const fadeSteps = 20;
+      const fadeInterval = 600 / fadeSteps;
+      let step = 0;
+      const fader = setInterval(() => {
+        step++;
+        trainSound.volume = Math.max(0, 1 - step / fadeSteps);
+        if (step >= fadeSteps) { clearInterval(fader); trainSound.pause(); }
+      }, fadeInterval);
+
+      train.classList.remove('pass2');
+      train.style.left = '-420px';
+      void train.offsetWidth;
+    }
+
+    btnTrain.addEventListener('click', async () => {
+      disableBtns();
+      await runTrain();
+      enableBtns();
+    });
+  </script>
+</body>
+</html>
